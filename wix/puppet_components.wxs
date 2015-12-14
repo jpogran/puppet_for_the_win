@@ -1,0 +1,254 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi' xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <!--
+  This is how to include wxi files.  We expect this file to define variables
+  like the version numbers and the upgrade UUID.
+  -->
+  <?include $(sys.SOURCEFILEDIR)include/puppet.wxi ?>
+
+  <Fragment>
+    <DirectoryRef Id='PuppetShortcutDir' >
+      <Component Id="PuppetShortcuts" Guid="0B69C3FF-8967-4F8A-AC71-0EAE34E91ACC" Win64="$(var.Win64)">
+        <Shortcut Id="PuppetShortcut" Name="Run Puppet Agent" Description="Run Puppet in an interactive command window" Target="[INSTALLDIR]bin\run_puppet_interactive.bat" Icon="PuppetShortcutIcon" WorkingDirectory="bin">
+          <Icon Id="PuppetShortcutIcon" SourceFile="conf\windows\stage\misc\puppetlabs.ico"/>
+        </Shortcut>
+        <Shortcut Id="FacterShortcut" Name="Run Facter" Description="Run Facter in an interactive command window" Target="[INSTALLDIR]bin\run_facter_interactive.bat" Icon="FacterShortcutIcon" WorkingDirectory="bin">
+          <Icon Id="FacterShortcutIcon" SourceFile="conf\windows\stage\misc\puppetlabs.ico"/>
+        </Shortcut>
+        <Shortcut Id="PuppetShellShortcut" Name="Start Command Prompt with Puppet" Description="Start a Command Prompt with Puppet already in the PATH and RUBYLIB load path." Target="[%ComSpec]" Arguments='/E:ON /K "[INSTALLDIR]bin\puppet_shell.bat"' Icon="PuppetShellShortcutIcon" WorkingDirectory="bin">
+          <Icon Id="PuppetShellShortcutIcon" SourceFile="conf\windows\stage\misc\puppetlabs.ico"/>
+        </Shortcut>
+        <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
+        <!-- This registry entry is required to be a keypath for this component -->
+        <RegistryValue Root="HKCU" Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurProductNameWord)" Name="installed" Value="1" Type="integer" KeyPath="yes" />
+      </Component>
+      <DirectoryRef Id='PuppetShortcutDocumentationDir' >
+        <Component Id="PuppetDocumentationShortcuts" Guid="651178BC-76D8-4574-B97B-B132064EE2FB" Win64="$(var.Win64)">
+          <CreateFolder />
+          <IniFile Id="PuppetSupportURL" Name="Get $(var.OurProductName) Support.url" Action="addLine" Section="InternetShortcut" Key="URL" Value="$(var.HelpLink)" Directory="PuppetShortcutDocumentationDir" />
+          <IniFile Id="PuppetCommunityURL" Name="Explore the Puppet Community.url" Action="addLine" Section="InternetShortcut" Key="URL" Value="$(var.CommunityLink)" Directory="PuppetShortcutDocumentationDir" />
+          <IniFile Id="PuppetNextStepURL" Name="$(var.OurProductName) First Steps.url" Action="addLine" Section="InternetShortcut" Key="URL" Value="$(var.NextStepLink)" Directory="PuppetShortcutDocumentationDir" />
+          <IniFile Id="PuppetManualURL" Name="$(var.OurProductName) Manual.url" Action="addLine" Section="InternetShortcut" Key="URL" Value="$(var.ManualLink)" Directory="PuppetShortcutDocumentationDir" />
+          <IniFile Id="PuppetForgeURL" Name="Puppet Forge.url" Action="addLine" Section="InternetShortcut" Key="URL" Value="$(var.ForgeLink)" Directory="PuppetShortcutDocumentationDir" />
+          <RemoveFolder Id="PuppetShortcutDocumentationDir" On="uninstall"/>
+          <RegistryValue Root="HKCU" Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurProductName)\Documentation" Name="installed" Value="1" Type="integer" KeyPath="yes" />
+        </Component>
+      </DirectoryRef>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <util:Group Id="AdminGroup" Name="Administrators"/>
+    <!--
+    If puppet is configured to run as someone other than LocalSystem
+    and we are installing or upgrading, then allow the account to
+    logon as a service and add the account to the local Administrators
+    account. If the account doesn't exist, the install will fail.
+    -->
+    <Component Id="PuppetServiceUser" Guid="0CCA1CDC-CD25-43A5-BE8A-0D455C63D1BE" Win64="$(var.Win64)">
+      <Condition><![CDATA[NOT Installed AND PUPPET_AGENT_ACCOUNT_USER <> "LocalSystem"]]></Condition>
+      <util:User Id="puppetServiceUser"
+                      Domain="[PUPPET_AGENT_ACCOUNT_DOMAIN]"
+                      Name="[PUPPET_AGENT_ACCOUNT_USER]"
+                      Password="[PUPPET_AGENT_ACCOUNT_PASSWORD]"
+                      LogonAsService="yes"
+                      CreateUser="no"
+                      UpdateIfExists="yes"
+                      RemoveOnUninstall="no">
+        <util:GroupRef Id="AdminGroup"/>
+      </util:User>
+    </Component>
+
+    <!-- This section inspired by: http://wix.sourceforge.net/manual-wix3/write_a_registry_entry.htm -->
+    <!-- We write to $(var.OurCompanyName)\$(var.OurCommonProductNameWord)
+    (Puppet Labs\CommonProduct)
+    in order to restore the PUPPET_MASTER_SERVER property -->
+    <Component Id="RegistryEntries" Guid="68F5D91C-49C8-43F7-940A-481007689E79" Win64="no">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurCommonProductNameWord)" Action="create" >
+        <!-- This is the default (aka 'unnamed') key value of this path -->
+        <RegistryValue Type="integer" Value="0"/>
+        <!-- This is the specified value of a key at this path -->
+        <RegistryValue Name="InstalledFlag" Value="1" Type="integer" KeyPath="yes"/>
+        <!-- Store properties for later recall during uninstall, upgrade, repair -->
+        <RegistryValue Name="RememberedPuppetMasterServer" Type="string" Value="[PUPPET_MASTER_SERVER]" />
+        <RegistryValue Name="RememberedPuppetAgentEnvironment" Type="string" Value="[PUPPET_AGENT_ENVIRONMENT]" />
+        <RegistryValue Name="RememberedPuppetCaServer" Type="string" Value="[PUPPET_CA_SERVER]" />
+        <RegistryValue Name="RememberedPuppetAgentCertname" Type="string" Value="[PUPPET_AGENT_CERTNAME]" />
+        <RegistryValue Name="RememberedPuppetAgentStartupMode" Type="string" Value="[PUPPET_AGENT_STARTUP_MODE]" />
+      </RegistryKey>
+      <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\services\eventlog\Application\Puppet" Action="createAndRemoveOnUninstall">
+        <RegistryValue Type="string" Name="EventMessageFile" Value="[INSTALLDIR]misc\puppetres.dll"/>
+        <RegistryValue Type="integer" Name="TypesSupported" Value="7"/>
+      </RegistryKey>
+    </Component>
+    <?if $(var.Platform) = x86 ?>
+      <Component Id="RegistryEntriesArchitectureDependent" Guid="E6D5AF4F-ACC4-4D11-AFCE-299A9ED2152C" Win64="no" Permanent="yes">
+        <!-- Product Specific Properties.  We keep INSTALLDIR here. -->
+        <RegistryKey Root="HKLM" Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurProductNameWord)" Action="create" >
+          <!-- This is the default (aka 'unnamed') key value of this path -->
+          <RegistryValue Type="integer" Value="0"/>
+          <!-- RememberedInstallDir -->
+          <RegistryValue Name="RememberedInstallDir" Type="string" Value="[INSTALLDIR]" KeyPath="yes" />
+          <!--
+          x86 install on top of x64 cannot capture the custom install path, because WIN64DUALFOLDERS will
+          string substitute, and replace 'Program Files' with 'Program Files (x86)' Fortunately, x64 installers have always had Permanent set for the x64 custom install path
+          so it will never be removed during uninstall.
+          -->
+        </RegistryKey>
+      </Component>
+    <?else?>
+      <Component Id="RegistryEntriesArchitectureDependent" Guid="E6D5AF4F-ACC4-4D11-AFCE-299A9ED2152C" Win64="no" Permanent="yes">
+        <RegistryKey Root="HKLM" Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurProductNameWord)" Action="create" >
+          <RegistryValue Type="integer" Value="0"/>
+          <!--
+          When upgrading from Puppet 3.6.x to Puppet 3.7 x64, the 3.6 x86 uninstall will remove the remembered x86
+          install location, which is problematic if a user chooses to switch back to 3.7 x86.  Going forward this
+          wouldn't be an issue since Permanent is set, but our hands are tied given prior art.
+
+          Fortunately, when Wix recalls the old property value with 'Program Files (x86)', it will not be automatically
+          string substituted to 'Program Files', which is a problem when going from x64 -> x86.
+          -->
+          <RegistryValue Name="RememberedInstallDir" Type="string" Value="[INSTALLDIR_X86]" />
+          <RegistryValue Name="RememberedInstallDir64" Type="string" Value="[INSTALLDIR]" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+    <?endif?>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id='ruby_bin'>
+      <!--Seriously?... http://stackoverflow.com/questions/9419411/wix-setting-service-startup-type-using-a-property-property-not-recognized -->
+      <!-- Yep, Seriously - http://sourceforge.net/mailarchive/forum.php?thread_name=CANJN1a6gDE2tUUnP4SE05m8Ojh2q0Y8LrWOxbrF89YyJJCHn1A%40mail.gmail.com&forum_name=wix-users -->
+      <!-- <Component Id='PuppetServiceAutomatic' Guid="639ECD7F-6186-43D5-9E1A-FC0278DBEE15" Win64="$(var.Win64)">
+        <Condition>
+          <![CDATA[ (PUPPET_AGENT_STARTUP_MODE ~<> "manual") AND (PUPPET_AGENT_STARTUP_MODE ~<> "disabled") ]]>
+        </Condition>
+        <File Id="RubyExeAutomatic" KeyPath="yes" Source="stagedir\sys\ruby\bin\ruby.exe" />
+        <ServiceInstall Id="ServiceInstaller" Account="[PUPPET_AGENT_ACCOUNT_DOMAIN]\[PUPPET_AGENT_ACCOUNT_USER]" Password="[PUPPET_AGENT_ACCOUNT_PASSWORD]" Description="Periodically fetches and applies configurations from a Puppet master server." DisplayName="Puppet Agent" Interactive="no" Name="$(var.PuppetServiceName)" Start="auto" Type="ownProcess" ErrorControl="normal" Vital="yes" Arguments="-rubygems &quot;[INSTALLDIR]service\daemon.rb&quot;" />
+        <ServiceControl Id="ServiceControlOptions" Start="install" Stop="both" Remove="uninstall" Name="$(var.PuppetServiceName)" Wait="yes" />
+      </Component> -->
+      <Component Id='PuppetServiceManual' Guid="752A5A25-9619-4EBA-AA8B-12D8C8688236" Win64="$(var.Win64)">
+        <Condition>
+          <![CDATA[PUPPET_AGENT_STARTUP_MODE ~= "manual"]]>
+        </Condition>
+        <File Id="RubyExeManual" KeyPath="yes" Source="stagedir\sys\ruby\bin\ruby.exe" />
+        <ServiceInstall Id="ServiceInstallerManual" Account="[PUPPET_AGENT_ACCOUNT_DOMAIN]\[PUPPET_AGENT_ACCOUNT_USER]" Password="[PUPPET_AGENT_ACCOUNT_PASSWORD]" Description="Periodically fetches and applies configurations from a Puppet master server." DisplayName="Puppet Agent" Interactive="no" Name="$(var.PuppetServiceName)" Start="demand" Type="ownProcess" ErrorControl="normal" Vital="yes" Arguments="-rubygems &quot;[INSTALLDIR]service\daemon.rb&quot;" />
+        <ServiceControl Id="ServiceControlOptionsManual" Stop="both" Remove="uninstall" Name="$(var.PuppetServiceName)" Wait="yes" />
+      </Component>
+      <Component Id='PuppetServiceDisabled' Guid="4D3A8CAF-C675-46AC-B3AD-75F00581D0DB" Win64="$(var.Win64)">
+        <Condition>
+          <![CDATA[PUPPET_AGENT_STARTUP_MODE ~= "disabled"]]>
+        </Condition>
+        <File Id="RubyExeDisabled" KeyPath="yes" Source="stagedir\sys\ruby\bin\ruby.exe" />
+        <ServiceInstall Id="ServiceInstallerDisabled" Account="[PUPPET_AGENT_ACCOUNT_DOMAIN]\[PUPPET_AGENT_ACCOUNT_USER]" Password="[PUPPET_AGENT_ACCOUNT_PASSWORD]" Description="Periodically fetches and applies configurations from a Puppet master server." DisplayName="Puppet Agent" Interactive="no" Name="$(var.PuppetServiceName)" Start="disabled" Type="ownProcess" ErrorControl="normal" Vital="yes" Arguments="-rubygems &quot;[INSTALLDIR]service\daemon.rb&quot;" />
+        <ServiceControl Id="ServiceControlOptionsDisabled" Stop="both" Remove="uninstall" Name="$(var.PuppetServiceName)" Wait="yes" />
+      </Component>
+      <Component Id='MCOService' Guid="7601FCEA-90B3-CC69-6A69-4087FBC7292D" Win64="$(var.Win64)">
+        <File Id="RubyWExe" KeyPath="yes" Source="stagedir\sys\ruby\bin\rubyw.exe" />
+        <!-- This service is installed with start set to demand because
+        it won't be correctly configured to start right away. The
+        puppet run that configures mcollective will allow it to start
+        and set it to automatic -->
+        <ServiceInstall Id="MCOServiceInstaller" Account="[PUPPET_AGENT_ACCOUNT_DOMAIN]\[PUPPET_AGENT_ACCOUNT_USER]" Password="[PUPPET_AGENT_ACCOUNT_PASSWORD]" Description="Puppet Labs server orchestration framework" DisplayName="Marionette Collective Server" Interactive="no" Name="mcollective" Start="demand" Type="ownProcess" ErrorControl="normal" Vital="yes" Arguments="-I&quot;[INSTALLDIR]puppet\lib;[INSTALLDIR]facter\lib;[INSTALLDIR]hiera\lib;[INSTALLDIR]mcollective\lib&quot; -rubygems &quot;[INSTALLDIR]mcollective\bin\mcollectived&quot; --daemonize" />
+        <ServiceControl Id="MCOStartService" Stop="both" Remove="uninstall" Name="mcollective" Wait="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id='service'>
+      <Component Id="service" Guid="98BBD159-8217-4B62-AFB3-9CF8EE37C74E">
+        <CreateFolder />
+        <File Id="PuppetDaemon" KeyPath="yes" Source="stagedir\service\daemon.rb" />
+      </Component>
+      <Component Id="service_nssm" Guid="52B1CD57-95A2-4CA4-AB8E-9DDD6DE8FC66">
+        <CreateFolder />
+        <File Id="NSSM" KeyPath="yes" Source="stagedir\service\nssm.exe" />
+        <ServiceInstall Id="PXPServiceInstaller" Account="[PUPPET_AGENT_ACCOUNT_DOMAIN]\[PUPPET_AGENT_ACCOUNT_USER]" Password="[PUPPET_AGENT_ACCOUNT_PASSWORD]" Description="Puppet Execution Protocol (PXP) Service" DisplayName="Puppet PXP Agent" Interactive="no" Name="pxp-agent" Start="demand" Type="ownProcess" ErrorControl="normal" Vital="yes" />
+        <!-- Various registry keys documented at https://nssm.cc/usage -->
+        <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\pxp-agent\Parameters">
+          <RegistryValue Name="AppDirectory" Value="[INSTALLDIR]pxp-agent\bin" Type="expandable" />
+          <RegistryValue Name="Application" Value="[INSTALLDIR]pxp-agent\bin\pxp-agent.exe" Type="expandable" />
+          <RegistryValue Name="AppParameters" Value="" Type="expandable" />
+          <RegistryValue Name="AppEnvironmentExtra" Value="PATH=[INSTALLDIR]sys\ruby\bin;%PATH%" Type="multiString" Action="append" />
+          <!-- Skip responding to WM_QUIT and WM_CLOSE -->
+          <RegistryValue Name="AppStopMethodSkip" Value="6" Type="integer" />
+          <RegistryKey Key="AppExit">
+            <!-- Stop the service completely on exit(2) (Invalid configuration) otherwise restart with NSSM service throttling -->
+            <!-- nssm AppExit codes reference https://nssm.cc/usage#exit -->
+            <RegistryValue Value="Restart" Type="string" />
+            <RegistryValue Name="2" Value="Exit" Type="string" />
+          </RegistryKey>
+        </RegistryKey>
+        <ServiceControl Id="PXPStartService" Stop="both" Remove="uninstall" Name="pxp-agent" Wait="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id='bin'>
+      <Component Id="PuppetInstallDirBinToPath" Guid="F46FA9A8-43A2-4379-8933-EAAE2D0E5D72" Win64="$(var.Win64)">
+        <CreateFolder />
+        <Environment Id="PuppetBinPath" Name="PATH" Value="[INSTALLDIR]bin" Permanent="no" Part="last" Action="set" System="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id='INSTALLDIR'>
+      <Component Id='PuppetAgentVersionFile' Guid="4A51050C-D761-472E-91D8-95FD2AB34384">
+        <File Id="VERSION" Source="stagedir\VERSION" KeyPath="yes" Checksum="yes"/>
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id="PuppetConfDir" >
+      <!-- This is a permanent directory, do not remove on uninstall -->
+      <Component Id="PuppetConfUnconditionalSettings" Permanent="yes" Guid="B9179A60-483F-4F32-8E3F-AD632B0DEBB4">
+        <CreateFolder />
+        <IniFile Id="PuppetConfServer" Name="puppet.conf" Action="addLine" Section="main" Key="server" Value="[PUPPET_MASTER_SERVER]" Directory="PuppetConfDir" />
+        <IniFile Id="PuppetConfPluginSync" Name="puppet.conf" Action="createLine" Section="main" Key="pluginsync" Value="true" Directory="PuppetConfDir" />
+        <IniFile Id="PuppetConfAutoflush" Name="puppet.conf" Action="createLine" Section="main" Key="autoflush" Value="true" Directory="PuppetConfDir" />
+      </Component>
+      <Component Id="PuppetConfWithAgentEnvironment" Permanent="yes" Guid="EC56FB39-A176-42BA-BB1C-10C8DE76AE67">
+        <Condition>PUPPET_AGENT_ENVIRONMENT</Condition>
+        <CreateFolder />
+        <!-- The agent environment setting will only be managed if the
+        PUPPET_AGENT_ENVIRONMENT is not an empty string -->
+        <!-- Manage the entry itself -->
+        <IniFile Id="PuppetConfAgentEnvironment" Name="puppet.conf" Action="addLine" Section="main" Key="environment" Value="[PUPPET_AGENT_ENVIRONMENT]" Directory="PuppetConfDir" />
+      </Component>
+      <Component Id="PuppetConfWithCertname" Permanent="yes" Guid="5D1813E1-0AEB-4965-B504-354D7F10DCEA">
+        <Condition>PUPPET_AGENT_CERTNAME</Condition>
+        <CreateFolder />
+        <!-- The certname setting will only be managed if the
+        PUPPET_AGENT_CERTNAME is not an empty string -->
+        <!-- Manage the entry itself -->
+        <IniFile Id="PuppetConfCertname" Name="puppet.conf" Action="addLine" Section="main" Key="certname" Value="[PUPPET_AGENT_CERTNAME]" Directory="PuppetConfDir" />
+      </Component>
+      <Component Id="PuppetConfWithCaServer" Permanent="yes" Guid="CE676CF1-2E12-4CDC-B87F-D4BC4E71FF85">
+        <Condition>PUPPET_CA_SERVER</Condition>
+        <CreateFolder />
+        <!-- The certname setting will only be managed if the
+        PUPPET_CA_SERVER is not an empty string -->
+        <IniFile Id="PuppetConfCaServer" Name="puppet.conf" Action="addLine" Section="main" Key="ca_server" Value="[PUPPET_CA_SERVER]" Directory="PuppetConfDir" />
+        </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id="CodeDir" >
+      <Component Id="CodeDir" Permanent="yes" Guid="0D29EB1B-604D-4FE1-A75C-F18CC230BEED">
+        <CreateFolder />
+        <File Id="HieraConf" KeyPath="yes" Source="stagedir\hiera\ext\hiera.yaml" />
+      </Component>
+    </DirectoryRef>
+    <DirectoryRef Id="ProductionDir" Name="production">
+      <Component Id="ProductionDir" Permanent="yes" Guid="b902efcd-756e-4340-8f13-5a79d46b93c7">
+        <CreateFolder />
+        <File Id="EnvironmentConf" KeyPath="yes" Source="stagedir\puppet\conf\environment.conf" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

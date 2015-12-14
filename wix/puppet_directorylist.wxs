@@ -1,0 +1,133 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi' xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <!--
+  This is how to include wxi files.  We expect this file to define variables
+  like the version numbers and the upgrade UUID.
+  -->
+  <?include $(sys.SOURCEFILEDIR)include/puppet.wxi ?>
+
+  <Fragment>
+    <!--
+      TARGETDIR is Usually C:/  This will also be the location the install package will be copied to
+      For more information: http://msdn.microsoft.com/en-us/library/aa372064.aspx
+
+      INSTALLDIR is the root of our application, which is C:/Program Files/Puppet Labs for us.
+    -->
+    <Directory Id='TARGETDIR' Name='SourceDir'>
+      <!-- The start menu shortcuts -->
+      <Directory Id='ProgramMenuFolder'>
+        <Directory Id='PuppetShortcutDir' Name="$(var.OurProductName)">
+          <Directory Id='PuppetShortcutDocumentationDir' Name="Documentation" />
+        </Directory>
+      </Directory>
+
+      <!-- The application itself -->
+      <Directory Id="$(var.PlatformProgramFilesFolder)" >
+        <Directory Id='PuppetLabs' Name="$(var.OurCompanyName)">
+            <Directory Id='sys' Name='sys'>
+              <Directory Id='ruby' Name ='ruby'>
+                <Directory Id='ruby_bin' Name='bin' />
+              </Directory>
+            </Directory>
+            <Directory Id='bin' Name='bin' />
+            <Directory Id='service' Name='service' />
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <!-- The CommonAppDataFolder is automatically filled in for us. -->
+      <Directory Id="CommonAppDataFolder" Name="CommonAppData">
+        <Directory Id="PuppetLabsAppData" Name="PuppetLabs">
+          <Directory Id="FacterAppData" Name="facter">
+            <Directory Id="FactsDotD" Name="facts.d">
+              <Component Id="PuppetInstallerFacts" Permanent="yes" Guid="4E7C234B-2837-4459-A20E-9503A922FCB9">
+                <CreateFolder>
+                  <Permission GenericAll="yes" User="Administrators" />
+                  <Permission GenericRead="yes" GenericExecute="yes" User="Everyone" />
+                </CreateFolder>
+              </Component>
+            </Directory>
+          </Directory>
+          <Directory Id="MCOAppData" Name="mcollective">
+            <Directory Id="MCOConfDir" Name="etc">
+              <Component Id="MCOConfDir" Permanent="yes" Guid="3E904914-17C7-138C-F5DF-280F680E067C">
+                <CreateFolder />
+              </Component>
+            </Directory>
+            <Directory Id="MCOVarDir" Name="var">
+              <Directory Id="MCOLogDir" Name="log">
+                <Component Id="MCOLogDir" Permanent="yes" Guid="F9357673-2AF2-90FA-8707-14EE37FA0657">
+                  <CreateFolder />
+                </Component>
+              </Directory>
+            </Directory>
+          </Directory>
+          <Directory Id="PuppetAppData" Name="puppet">
+            <Directory Id="PuppetConfDir" Name="etc">
+            </Directory>
+            <Directory Id="PuppetVarDir" Name="var">
+              <Component Id="PuppetVarDir" Permanent="yes" Guid="B95A17F3-CF5E-4EC7-859E-F10C0965645F">
+                <CreateFolder />
+              </Component>
+            </Directory>
+          </Directory>
+          <Directory Id="CodeDir" Name="code">
+            <Directory Id="HieraDataDir" Name="hieradata">
+              <Component Id="HieraDataDir" Permanent="yes" Guid="2438387C-BEA5-47C1-8B43-46FE30E14BEA">
+                <CreateFolder />
+              </Component>
+            </Directory>
+            <Directory Id="CodeModulesDir" Name="modules">
+              <Component Id="CodeModulesDir" Permanent="yes" Guid="ae4a85a4-a305-4c95-b254-c2f06c586482">
+                <CreateFolder />
+              </Component>
+            </Directory>
+            <Directory Id="EnvironmentsDir" Name="environments">
+              <Component Id="EnvironmentsDir" Permanent="yes" Guid="6a6a390a-8783-40b6-b49d-9e2b368e069d">
+                <CreateFolder />
+              </Component>
+              <Directory Id="ProductionDir" Name="production">
+                <Directory Id="ManifestsDir" Name="manifests">
+                  <Component Id="ManifestsDir" Permanent="yes" Guid="5484fadf-6d5e-4053-83fc-ea68918d6f2e">
+                    <CreateFolder />
+                  </Component>
+                </Directory>
+                <Directory Id="ModulesDir" Name="modules">
+                  <Component Id="ModulesDir" Permanent="yes" Guid="cbe9cc8d-3a38-4c4c-9f16-39e42093481a">
+                    <CreateFolder />
+                  </Component>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+          <Directory Id="pxpAgentDataFolder" Name="pxp-agent">
+            <Directory Id="pxpAgentDataFolderVar" Name="var">
+              <Directory Id="pxpAgentDataFolderLog" Name="log">
+                <Component Id="PXPAgentLogDir" Guid="DF0D0E2A-F069-4933-8AE9-5E779C8E93B9" Permanent="yes" >
+                  <CreateFolder/>
+                </Component>
+              </Directory>
+              <Directory Id="pxpAgentDataFolderRun" Name="run" >
+                <Component Id="PXPAgentRunDir" Guid="4AD77345-D8AE-40E4-B41C-706EC51FE63F" Permanent="yes" >
+                  <CreateFolder/>
+                </Component>
+              </Directory>
+              <Directory Id="pxpAgentDataFolderSpool" Name="spool" >
+                <Component Id="PXPAgentSpoolDir" Guid="F265A518-A7B7-4FA8-85D8-7306A10E1659" Permanent="yes" >
+                  <CreateFolder/>
+                </Component>
+              </Directory>
+            </Directory>
+            <Directory Id="pxpAgentDataFolderEtc" Name="etc">
+              <Directory Id="pxpAgentDataFolderModules" Name="modules" >
+                <Component Id="PXPAgentModulesDir" Guid="EC0FC78E-CCC5-42EB-AF09-378274AC7530" Permanent="yes" >
+                  <CreateFolder/>
+                </Component>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+  </Fragment>
+</Wix>

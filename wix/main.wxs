@@ -1,0 +1,363 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi' xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <!--
+  This is how to include wxi files.  We expect this file to define variables
+  like the version numbers and the upgrade UUID.
+  -->
+  <?include $(sys.SOURCEFILEDIR)include/puppet.wxi ?>
+
+  <!--
+  The Product Id should not be changed, the unique identifier enables
+  un-install of the MSI package easily.  More information about supporting
+  major upgrades is available at:
+  http://wix.sourceforge.net/manual-wix3/major_upgrade.htm
+  Name is made of localized product name and version number.
+  -->
+  <Product Id="$(var.ProductCode)"
+                  UpgradeCode="$(var.UpgradeCode)"
+                  Name="$(var.OurProductName) Agent$(var.OurProductPlatformText)"
+                  Language='1033'
+                  Codepage='1252'
+                  Version="$(var.ProductVersionNumber)"
+                  Manufacturer="$(var.OurCompanyName)">
+
+    <Package InstallerVersion='300'
+                      InstallScope="perMachine"
+                      Description="$(var.OurProductName)$(var.OurProductPlatformText) Installer"
+                      Comments="http://www.puppetlabs.com/"
+                      Compressed="yes"
+                      Platform="$(var.Platform)" />
+
+    <!-- We allow "downgrades" to support Puppet to Puppet Agent -->
+    <MajorUpgrade AllowDowngrades="yes" />
+
+    <!-- Note, this UI element must come _after_ the Package element -->
+    <UI>
+      <!-- (#12473) (#12474) Installation Directory Dialog -->
+      <UIRef Id="WixUI_PuppetInstallDir"/>
+      <!-- To use WixUI_InstallDir, you must set a property named
+         WIXUI_INSTALLDIR with a value of the ID of the directory you want the
+         user to be able to specify the location of. -->
+      <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+      <!-- This text is placed as a literal string in the GUI -->
+      <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT"
+                       Value="Manage your first resources on this node, explore the Puppet community and get support using the shortcuts in the Documentation folder of your Start Menu." />
+    </UI>
+
+    <Media Id="1" Cabinet="$(var.OurProductNameWord).cab" EmbedCab="yes" CompressionLevel="high" />
+
+    <?if $(var.Platform) = x64 ?>
+      <!-- http://wixtoolset.org/documentation/manual/v3/howtos/redistributables_and_install_checks/block_install_on_os.html -->
+      <Condition Message="$(var.OurProductName) is no longer supported on Windows Server 2003.">
+        <![CDATA[Installed OR (VersionNT64 >= 600)]]>
+      </Condition>
+    <?else?>
+      <Condition Message="$(var.OurProductName) is no longer supported on Windows Server 2003.">
+        <![CDATA[Installed OR (VersionNT >= 600)]]>
+      </Condition>
+    <?endif ?>
+
+    <!-- It is possible to override WixVariable's on the command line using the
+         -d flag to light when Overridable="yes". -->
+    <!-- #12475 - Specify the license. -->
+    <WixVariable Id="WixUILicenseRtf" Value="conf\windows\stage\misc\LICENSE.rtf" Overridable="yes" />
+    <!-- (#12521) Use local Bitmaps -->
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.BitmapFolder)\bannrbmp.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.BitmapFolder)\$(var.DialogBitmap)" />
+    <WixVariable Id="WixUIExclamationIco" Value="$(var.BitmapFolder)\exclamic.ico" />
+    <WixVariable Id="WixUIInfoIco" Value="$(var.BitmapFolder)\info.ico" />
+    <WixVariable Id="WixUINewIco" Value="$(var.BitmapFolder)\new.ico" />
+    <WixVariable Id="WixUIUpIco" Value="$(var.BitmapFolder)\up.ico" />
+
+    <!-- Add/Remove Programs icon and help link -->
+    <Icon Id="$(var.OurCompanyNameWord).ico" SourceFile="conf\windows\stage\misc\puppetlabs.ico"/>
+    <Property Id="ARPPRODUCTICON" Value="$(var.OurCompanyNameWord).ico" />
+    <Property Id="ARPHELPLINK" Value="$(var.HelpLink)" />
+    <!-- Save destination folder in Add/Remove programs (ARP) registry key -->
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLDIR]" After="CostFinalize" />
+
+    <!-- This property is used in the localization strings for the GUI -->
+    <Property Id="VersionUIString" Value="$(var.VersionUIString)" />
+
+    <!--
+      By default, install puppet agent to run as LocalSystem. Password
+      is hidden to prevent it from appearing in msiexec log files
+    -->
+    <Property Id="PUPPET_AGENT_ACCOUNT_DOMAIN" Value="."/>
+    <Property Id="PUPPET_AGENT_ACCOUNT_USER" Value="LocalSystem"/>
+    <Property Id="PUPPET_AGENT_ACCOUNT_PASSWORD" Hidden="yes"/>
+
+    <!--
+      Remembered Property Pattern
+      http://robmensching.com/blog/posts/2010/5/2/The-WiX-toolsets-Remember-Property-pattern
+      -->
+    <!-- Registry settings, remembered install dir is dependent on x86/64.
+         Everything else stays with x86 so both installer types can see it
+      -->
+    <Property Id="INSTALLDIR">
+      <!-- Recall the property in repair, upgrade, and uninstall scenarios -->
+      <RegistrySearch Id="RecallInstallDir"
+                                   Root="HKLM"
+                                   Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurProductNameWord)"
+                                   Name="$(var.RememberedInstallDirRegKey)"
+                                   Type="raw"
+                                   Win64="no" />
+    </Property>
+    <Property Id="INSTALLDIR_X86" >
+      <!-- Recall the property in repair, upgrade, and uninstall scenarios -->
+      <RegistrySearch Id="RecallInstallDirx86"
+                                   Root="HKLM"
+                                   Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurProductNameWord)"
+                                   Name="RememberedInstallDir"
+                                   Type="raw"
+                                   Win64="no" />
+    </Property>
+    <!-- Note the static default value of "puppet".  This will be overriden by
+         the command line. -->
+    <Property Id="PUPPET_MASTER_SERVER">
+      <!-- Recall the property in repair, upgrade, and uninstall scenarios -->
+      <RegistrySearch Id="RecallPuppetMasterServer"
+                                   Root="HKLM"
+                                   Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurCommonProductNameWord)"
+                                   Name="RememberedPuppetMasterServer"
+                                   Type="raw"
+                                   Win64="no" />
+    </Property>
+    <Property Id="PUPPET_AGENT_ENVIRONMENT">
+      <!-- Recall the property in repair, upgrade, and uninstall scenarios -->
+      <RegistrySearch Id="RecallPuppetAgentEnvironment"
+                                   Root="HKLM"
+                                   Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurCommonProductNameWord)"
+                                   Name="RememberedPuppetAgentEnvironment"
+                                   Type="raw"
+                                   Win64="no" />
+    </Property>
+    <Property Id="PUPPET_AGENT_CERTNAME">
+      <!-- Recall the property in repair, upgrade, and uninstall scenarios -->
+      <RegistrySearch Id="RecallPuppetAgentCertname"
+                                   Root="HKLM"
+                                   Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurCommonProductNameWord)"
+                                   Name="RememberedPuppetAgentCertname"
+                                   Type="raw"
+                                   Win64="no" />
+    </Property>
+    <Property Id="PUPPET_CA_SERVER">
+      <RegistrySearch Id="RecallPuppetCAServer"
+                                   Root="HKLM"
+                                   Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurCommonProductNameWord)"
+                                   Name="RememberedPuppetCaServer"
+                                   Type="raw"
+                                   Win64="no" />
+    </Property>
+    <Property Id="PUPPET_AGENT_STARTUP_MODE">
+      <RegistrySearch Id="RecallPuppetAgentStartupMode"
+                                   Root="HKLM"
+                                   Key="SOFTWARE\$(var.OurCompanyName)\$(var.OurCommonProductNameWord)"
+                                   Name="RememberedPuppetAgentStartupMode"
+                                   Type="raw"
+                                   Win64="no" />
+    </Property>
+
+    <!-- Custom Actions to handle command line property values that override
+         remembered property values -->
+    <!-- INSTALLDIR -->
+    <CustomAction Id="SaveCmdLineInstallDir"
+                              Property="CMDLINE_INSTALLDIR"
+                              Value="[INSTALLDIR]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetFromCmdLineInstallDir"
+                              Property="INSTALLDIR"
+                              Value="[CMDLINE_INSTALLDIR]"
+                              Execute="firstSequence" />
+    <!-- PUPPET_MASTER_SERVER -->
+    <CustomAction Id="SaveCmdLinePuppetMasterServer"
+                              Property="CMDLINE_PUPPET_MASTER_SERVER"
+                              Value="[PUPPET_MASTER_SERVER]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetFromCmdLinePuppetMasterServer"
+                              Property="PUPPET_MASTER_SERVER"
+                              Value="[CMDLINE_PUPPET_MASTER_SERVER]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetDefaultPuppetMasterServer"
+                              Property="PUPPET_MASTER_SERVER"
+                              Value="puppet"
+                              Execute="firstSequence" />
+    <!-- PUPPET_AGENT_ENVIRONMENT -->
+    <CustomAction Id="SaveCmdLinePuppetAgentEnvironment"
+                              Property="CMDLINE_PUPPET_AGENT_ENVIRONMENT"
+                              Value="[PUPPET_AGENT_ENVIRONMENT]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetFromCmdLinePuppetAgentEnvironment"
+                              Property="PUPPET_AGENT_ENVIRONMENT"
+                              Value="[CMDLINE_PUPPET_AGENT_ENVIRONMENT]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetDefaultPuppetAgentEnvironment"
+                              Property="PUPPET_AGENT_ENVIRONMENT"
+                              Value="production"
+                              Execute="firstSequence" />
+    <!-- PUPPET_AGENT_CERTNAME -->
+    <CustomAction Id="SaveCmdLinePuppetAgentCertname"
+                              Property="CMDLINE_PUPPET_AGENT_CERTNAME"
+                              Value="[PUPPET_AGENT_CERTNAME]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetFromCmdLinePuppetAgentCertname"
+                              Property="PUPPET_AGENT_CERTNAME"
+                              Value="[CMDLINE_PUPPET_AGENT_CERTNAME]"
+                              Execute="firstSequence" />
+    <!-- PUPPET_CA_SERVER -->
+    <CustomAction Id="SaveCmdLinePuppetCaServer"
+                              Property="CMDLINE_PUPPET_CA_SERVER"
+                              Value="[PUPPET_CA_SERVER]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetFromCmdLinePuppetCaServer"
+                              Property="PUPPET_CA_SERVER"
+                              Value="[CMDLINE_PUPPET_CA_SERVER]"
+                              Execute="firstSequence" />
+    <!-- PUPPET_AGENT_STARTUP_MODE -->
+    <CustomAction Id="SaveCmdLinePuppetAgentStartupMode"
+                              Property="CMDLINE_PUPPET_AGENT_STARTUP_MODE"
+                              Value="[PUPPET_AGENT_STARTUP_MODE]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetFromCmdLinePuppetAgentStartupMode"
+                              Property="PUPPET_AGENT_STARTUP_MODE"
+                              Value="[CMDLINE_PUPPET_AGENT_STARTUP_MODE]"
+                              Execute="firstSequence" />
+    <CustomAction Id="SetDomainToLocalComputer"
+                              Property="PUPPET_AGENT_ACCOUNT_DOMAIN"
+                              Value="[ComputerName]"
+                              Execute="firstSequence"/>
+    <CustomAction Id="SetDomainToNtAuthority"
+                              Property="PUPPET_AGENT_ACCOUNT_DOMAIN"
+                              Value="NT AUTHORITY"
+                              Execute="firstSequence"/>
+
+    <?if $(var.Platform)
+                              = x86 ?>
+      <!-- If these fail, we don't want to fail the installer -->
+      <!-- We can't do a registry search for powershell's installed location because it will turn up the WOW64Node version due to not being able to bypass redirection in RegistrySearch
+           So we will assume the default install location and if it fails, we will ignore the error.
+           this is the only way to grab path without expanding variables
+           [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment\\").GetValue("PATH", "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames).ToString();
+           [System.Text.RegularExpressions.Regex]::Replace([Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("SYSTEM\CurrentControlSet\Control\Session Manager\Environment\").GetValue("PATH", "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames).ToString(), "c:\\Program files\\Puppet Labs\\Puppet\\bin(?>;)?", "", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+
+           "c:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NonInteractive -InputFormat None -NoProfile -ExecutionPolicy Bypass -Command "[System.Text.RegularExpressions.Regex]::Replace([Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SYSTEM\CurrentControlSet\Control\Session Manager\Environment\').GetValue('PATH', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames).ToString(),  [System.Text.RegularExpressions.Regex]::Escape('c:\Program Files\Puppet Labs\Puppet\bin') + '(?>;)?', '', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase) | %{[System.Environment]::SetEnvironmentVariable('PATH',$_,'Machine')}" &quot;[%WINDIR]\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NonInteractive -InputFormat None -NoProfile -ExecutionPolicy Bypass -Command &quot;[\[]System.Text.RegularExpressions.Regex[\]]::Replace([\[]Microsoft.Win32.Registry[\]]::LocalMachine.OpenSubKey(&apos;SYSTEM\CurrentControlSet\Control\Session Manager\Environment\&apos;).GetValue(&apos;PATH&apos;, &apos;&apos;, [\[]Microsoft.Win32.RegistryValueOptions[\]]::DoNotExpandEnvironmentNames).ToString(),  [\[]System.Text.RegularExpressions.Regex[\]]::Escape(&apos;[ProgramFiles64Folder]$(var.OurCompanyName)\Puppet\bin&apos;) + &apos;([\?]&gt;;)[\?]&apos;, &apos;&apos;, [\[]System.Text.RegularExpressions.RegexOptions[\]]::IgnoreCase) | %[\{][\[]System.Environment[\]]::SetEnvironmentVariable(&apos;PATH&apos;,$_, &apos;Machine&apos;)[\}]&quot;
+      -->
+      <CustomAction Id="Remove64BitPath_SetProp"
+                                Property="Remove64BitPath"
+                                Value="&quot;[%WINDIR]\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NonInteractive -InputFormat None -NoProfile -ExecutionPolicy Bypass -Command &quot;[\[]System.Text.RegularExpressions.Regex[\]]::Replace([\[]Microsoft.Win32.Registry[\]]::LocalMachine.OpenSubKey(&apos;SYSTEM\CurrentControlSet\Control\Session Manager\Environment\&apos;).GetValue(&apos;PATH&apos;, &apos;&apos;, [\[]Microsoft.Win32.RegistryValueOptions[\]]::DoNotExpandEnvironmentNames).ToString(),  [\[]System.Text.RegularExpressions.Regex[\]]::Escape(&apos;[ProgramFiles64Folder]$(var.OurCompanyName)\Puppet\bin&apos;) + &apos;([\?]&gt;;)[\?]&apos;, &apos;&apos;, [\[]System.Text.RegularExpressions.RegexOptions[\]]::IgnoreCase) | %[\{][\[]System.Environment[\]]::SetEnvironmentVariable(&apos;PATH&apos;,$_, &apos;Machine&apos;)[\}]&quot;"
+                                Execute="immediate" />
+      <CustomAction Id="Remove64BitPath"
+                                BinaryKey="WixCA"
+                                DllEntry="CAQuietExec64"
+                                Execute="deferred"
+                                Return="ignore" />
+      <CustomAction Id="Remove64BitProgramFiles_SetProp"
+                                Property="Remove64BitProgramFiles"
+                                Value="&quot;[%WINDIR]\System32\cmd.exe&quot; /c IF EXIST &quot;[ProgramFiles64Folder]$(var.OurCompanyName)\&quot; rmdir /s /q &quot;[ProgramFiles64Folder]$(var.OurCompanyName)&quot;"
+                                Execute="immediate" />
+      <CustomAction Id="Remove64BitProgramFiles"
+                                BinaryKey="WixCA"
+                                DllEntry="CAQuietExec64"
+                                Execute="deferred"
+                                Return="ignore" />
+    <?endif?>
+
+    <!-- First, save off properties specified on the command line Second,
+         restore the properties set by the command line overriding the recalled
+         value from the registry -->
+    <InstallUISequence>
+      <!-- INSTALLDIR -->
+      <Custom Action='SaveCmdLineInstallDir' Before='AppSearch' />
+      <Custom Action='SetFromCmdLineInstallDir' After='AppSearch'>
+        CMDLINE_INSTALLDIR
+      </Custom>
+      <!-- PUPPET_MASTER_SERVER -->
+      <Custom Action='SaveCmdLinePuppetMasterServer' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetMasterServer' After='AppSearch'>
+        CMDLINE_PUPPET_MASTER_SERVER
+      </Custom>
+      <Custom Action='SetDefaultPuppetMasterServer' After='AppSearch'>
+        PUPPET_MASTER_SERVER="" </Custom>
+      <!-- PUPPET_AGENT_ENVIRONMENT -->
+      <Custom Action='SaveCmdLinePuppetAgentEnvironment' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetAgentEnvironment' After='AppSearch'>
+        CMDLINE_PUPPET_AGENT_ENVIRONMENT
+      </Custom>
+      <Custom Action='SetDefaultPuppetAgentEnvironment' After='AppSearch'>
+        PUPPET_AGENT_ENVIRONMENT="" </Custom>
+      <!-- PUPPET_AGENT_CERTNAME -->
+      <Custom Action='SaveCmdLinePuppetAgentCertname' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetAgentCertname' After='AppSearch'>
+        CMDLINE_PUPPET_AGENT_CERTNAME
+      </Custom>
+      <!-- PUPPET_CA_SERVER -->
+      <Custom Action='SaveCmdLinePuppetCaServer' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetCaServer' After='AppSearch'>
+        CMDLINE_PUPPET_CA_SERVER
+      </Custom>
+      <!-- PUPPET_AGENT_STARTUP_MODE -->
+      <Custom Action='SaveCmdLinePuppetAgentStartupMode' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetAgentStartupMode' After='AppSearch'>
+        CMDLINE_PUPPET_AGENT_STARTUP_MODE
+      </Custom>
+      <!-- PUPPET_AGENT_ACCOUNT_DOMAIN -->
+      <Custom Action='SetDomainToLocalComputer' After='AppSearch'>
+        PUPPET_AGENT_ACCOUNT_DOMAIN = "." </Custom>
+      <Custom Action='SetDomainToNtAuthority' After='SetDomainToLocalComputer'>
+        (PUPPET_AGENT_ACCOUNT_USER ~= "LocalService") OR (PUPPET_AGENT_ACCOUNT_USER ~= "NetworkService")
+      </Custom>
+    </InstallUISequence>
+    <InstallExecuteSequence>
+      <!-- INSTALLDIR -->
+      <Custom Action='SaveCmdLineInstallDir' Before='AppSearch' />
+      <Custom Action='SetFromCmdLineInstallDir' After='AppSearch'>
+        CMDLINE_INSTALLDIR
+      </Custom>
+      <!-- PUPPET_MASTER_SERVER -->
+      <Custom Action='SaveCmdLinePuppetMasterServer' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetMasterServer' After='AppSearch'>
+        CMDLINE_PUPPET_MASTER_SERVER
+      </Custom>
+      <Custom Action='SetDefaultPuppetMasterServer' After='AppSearch'>
+        PUPPET_MASTER_SERVER="" </Custom>
+      <!-- PUPPET_AGENT_ENVIRONMENT -->
+      <Custom Action='SaveCmdLinePuppetAgentEnvironment' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetAgentEnvironment' After='AppSearch'>
+        CMDLINE_PUPPET_AGENT_ENVIRONMENT
+      </Custom>
+      <Custom Action='SetDefaultPuppetAgentEnvironment' After='AppSearch'>
+        PUPPET_AGENT_ENVIRONMENT="" </Custom>
+       <!-- PUPPET_AGENT_CERTNAME -->
+      <Custom Action='SaveCmdLinePuppetAgentCertname' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetAgentCertname' After='AppSearch'>
+        CMDLINE_PUPPET_AGENT_CERTNAME
+      </Custom>
+      <!-- PUPPET_CA_SERVER -->
+      <Custom Action='SaveCmdLinePuppetCaServer' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetCaServer' After='AppSearch'>
+        CMDLINE_PUPPET_CA_SERVER
+      </Custom>
+      <!-- PUPPET_AGENT_START_MODE -->
+      <Custom Action='SaveCmdLinePuppetAgentStartupMode' Before='AppSearch' />
+      <Custom Action='SetFromCmdLinePuppetAgentStartupMode' After='AppSearch'>
+        CMDLINE_PUPPET_AGENT_STARTUP_MODE
+      </Custom>
+      <!-- PUPPET_AGENT_ACCOUNT_DOMAIN -->
+      <Custom Action='SetDomainToLocalComputer' After='AppSearch'>
+        PUPPET_AGENT_ACCOUNT_DOMAIN = "." </Custom>
+      <Custom Action='SetDomainToNtAuthority' After='SetDomainToLocalComputer'>
+        (PUPPET_AGENT_ACCOUNT_USER ~= "LocalService") OR (PUPPET_AGENT_ACCOUNT_USER ~= "NetworkService")
+      </Custom>
+      <?if $(var.Platform) = x86 ?>
+        <Custom Action='Remove64BitPath_SetProp' After='CostFinalize' />
+        <Custom Action='Remove64BitProgramFiles_SetProp' After='CostFinalize' />
+        <Custom Action='Remove64BitProgramFiles' After='InstallFiles'>
+          <![CDATA[VersionNT64 >= 100 AND $(var.Win64) = no AND NOT (&$(var.OurProductNameWord)Runtime = 2)]]>
+        </Custom>
+        <Custom Action='Remove64BitPath' After='InstallFiles'>
+          <![CDATA[VersionNT64 >= 100 AND $(var.Win64) = no AND NOT (&$(var.OurProductNameWord)Runtime = 2)]]>
+        </Custom>
+      <?endif?>
+    </InstallExecuteSequence>
+  </Product>
+</Wix>
