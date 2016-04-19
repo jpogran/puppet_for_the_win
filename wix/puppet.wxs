@@ -25,7 +25,7 @@
       InstallerVersion='300'
       InstallScope="perMachine"
       Description="$(var.OurProductName)$(var.OurProductPlatformText) Installer"
-      Comments="http://www.puppetlabs.com/"
+      Comments="http://www.puppet.com/"
       Compressed="yes"
       Platform="$(var.Platform)"
       />
